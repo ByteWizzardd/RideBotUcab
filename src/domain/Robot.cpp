@@ -11,7 +11,33 @@ namespace OSBot {
 
 Robot::Robot(Environment &env)
     : environment_(env), currentPosition_(1, 1), currentState_(State::IDLE),
-      running_(false), pathIndex_(0), obstaclesAvoided_(0) {}
+      running_(false), pathIndex_(0), obstaclesAvoided_(0), cellsTraveled_(0) {}
+
+// ... existing code ...
+
+bool Robot::moveTo(const Point &newPos) {
+  // Validar que la posición esté dentro de los límites del mapa
+  if (!sensePosition(newPos)) {
+    // Posición inválida o bloqueada
+    return false;
+  }
+  
+  // *** INTERACCIÓN CON SECCIÓN CRÍTICA ***
+  // Esta llamada modifica el mapa compartido (protegido por mutex interno)
+  environment_.updateRobotPosition(newPos);
+  currentPosition_ = newPos;
+  
+  // Incrementar contador de celdas recorridas
+  cellsTraveled_++;
+  
+  return true;
+}
+
+void Robot::setPosition(const Point &pos) {
+    currentPosition_ = pos;
+    // Actualizar también en el entorno para visualización/colisiones
+    environment_.updateRobotPosition(pos);
+}
 
 Robot::~Robot() { stop(); }
 
@@ -53,10 +79,10 @@ Point Robot::getPosition() const { return currentPosition_; }
 void Robot::run() {
   std::cout << "[Robot] Bucle principal iniciado\n";
   
-  Point lastGoal = environment_.getGoal(); // Guardar objetivo inicial
+  Point lastGoal = getGoal(); // Guardar objetivo inicial
 
   while (running_.load()) {
-    Point currentGoal = environment_.getGoal();
+    Point currentGoal = getGoal();
     
     // Detectar si el objetivo cambió
     if (currentState_ == State::REACHED_GOAL && currentGoal != lastGoal) {
@@ -65,6 +91,14 @@ void Robot::run() {
       plannedPath_.clear();
       pathIndex_ = 0;
       lastGoal = currentGoal;
+    }
+    
+    // Forzar actualización si el objetivo cambia mientras se navega
+    if (currentState_ == State::NAVIGATING && currentGoal != lastGoal) {
+         lastGoal = currentGoal;
+         // Opcional: Recalcular ruta inmediatamente si el objetivo cambia drásticamente
+         plannedPath_.clear(); 
+         pathIndex_ = 0;
     }
     
     if (currentState_ == State::NAVIGATING) {
@@ -84,7 +118,7 @@ void Robot::run() {
 }
 
 void Robot::navigate() {
-  Point goal = environment_.getGoal();
+  Point goal = getGoal();
 
   // Verificar si ya alcanzó el objetivo
   if (currentPosition_ == goal) {
@@ -118,7 +152,7 @@ void Robot::navigate() {
 }
 
 void Robot::navigateGreedy() {
-  Point goal = environment_.getGoal();
+  Point goal = getGoal();
 
   // Verificar si ya alcanzó el objetivo
   if (currentPosition_ == goal) {
@@ -186,19 +220,6 @@ int Robot::manhattanDistance(const Point &a, const Point &b) const {
   return std::abs(a.x - b.x) + std::abs(a.y - b.y);
 }
 
-bool Robot::moveTo(const Point &newPos) {
-  // Validar que la posición esté dentro de los límites del mapa
-  if (!sensePosition(newPos)) {
-    // Posición inválida o bloqueada
-    return false;
-  }
-  
-  // *** INTERACCIÓN CON SECCIÓN CRÍTICA ***
-  // Esta llamada modifica el mapa compartido (protegido por mutex interno)
-  environment_.updateRobotPosition(newPos);
-  currentPosition_ = newPos;
-  return true;
-}
 
 // ========== NUEVAS FUNCIONES: Detección de Stuck y Pathfinding ==========
 
@@ -229,13 +250,13 @@ void Robot::recalculatePath() {
   
   // Calcular ruta con A* usando el mapa real del Environment
   Route route =
-      AStar::find_path(currentPosition_, environment_.getGoal(), environment_);
+      AStar::find_path(currentPosition_, getGoal(), environment_);
 
   // Convertir Route a vector de Points
   plannedPath_.clear();
   for (const auto &waypoint : route) {
     plannedPath_.push_back(
-        Point(static_cast<int>(waypoint.x), static_cast<int>(waypoint.y)));
+        OSBot::Point(static_cast<int>(waypoint.x), static_cast<int>(waypoint.y)));
   }
 
   pathIndex_ = 0;

@@ -20,6 +20,10 @@ int RobotManager::addRobot(const Point& homePosition) {
     
     int robotId = nextRobotId_++;
     auto robot = std::make_unique<Robot>(environment_);
+    
+    // IMPORTANTE: Establecer la posición inicial correcta en el robot
+    robot->setPosition(homePosition);
+    
     auto robotInfo = std::make_unique<RobotInfo>(robotId, std::move(robot), homePosition);
     
     robots_[robotId] = std::move(robotInfo);
@@ -81,6 +85,27 @@ void RobotManager::unassignTask(int robotId) {
     }
 }
 
+bool RobotManager::setRobotGoal(int robotId, const Point& goal) {
+    std::lock_guard<std::mutex> lock(robotsMutex_);
+    
+    auto it = robots_.find(robotId);
+    if (it != robots_.end() && it->second->robot) {
+        it->second->robot->setPersonalGoal(goal);
+        return true;
+    }
+    return false;
+}
+
+void RobotManager::clearAllPersonalGoals() {
+    std::lock_guard<std::mutex> lock(robotsMutex_);
+    
+    for (auto& [id, info] : robots_) {
+        if (info && info->robot) {
+            info->robot->clearPersonalGoal();
+        }
+    }
+}
+
 size_t RobotManager::getRobotCount() const {
     std::lock_guard<std::mutex> lock(robotsMutex_);
     return robots_.size();
@@ -128,20 +153,27 @@ void RobotManager::update() {
   for (auto &pair : robots_) {
     auto &info = pair.second;
     if (info && info->robot) {
-      // Update state
-      State previousState = info->currentState;
-      info->currentState = info->robot->getState();
-      info->lastUpdateTime = std::chrono::system_clock::now();
-      
-      // Update cells traveled from robot's position history
-      info->cellsTraveled = info->robot->getCellsTraveled();
-      
-      // Update obstacles avoided
-      info->obstaclesAvoided = info->robot->getObstaclesAvoided();
-      
-      // Distance is approximately cells traveled (each cell ~= 1 meter)
-      info->totalDistanceTraveled = static_cast<double>(info->cellsTraveled);
-      
+      // Actualizar estadísticas usando métodos de la clase Robot
+    State previousState = info->currentState; // Keep previous state for task completion check
+    info->currentState = info->robot->getState();
+    info->currentTaskId = -1; // TODO: Integrar con TaskScheduler
+    info->cellsTraveled = info->robot->getCellsTraveled();
+    info->obstaclesAvoided = info->robot->getObstaclesAvoided();
+    
+    // Obtener última posición para calcular distancia recorrida
+    Point currentPos = info->robot->getPosition();
+    // (La distancia se calcula mejor en el Robot tracking, pero aquí es una aproximación simple si se necesita)
+    // Por ahora usamos lo que el robot reporta si tuviera ese método, o lo calculamos aquí
+    // Como Robot::getCellsTraveled ya nos da pasos, usaremos eso y asumimos distancia = pasos * longitud celda
+    
+    // Convertir pasos a distancia real (asumiendo 1 celda = 1 metro por simplificación)
+    info->totalDistanceTraveled = static_cast<double>(info->cellsTraveled); // * CELL_SIZE
+    
+    // Actualizar información del objetivo
+    info->currentGoal = info->robot->getGoal();
+    info->hasPersonalGoal = info->robot->hasPersonalGoal();
+    
+    info->lastUpdateTime = std::chrono::system_clock::now();
       // If robot just reached goal, increment completed tasks
       if (previousState == State::NAVIGATING && 
           info->currentState == State::REACHED_GOAL) {

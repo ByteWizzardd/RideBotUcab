@@ -77,6 +77,9 @@ void WebServer::serverLoop() {
                   int y = std::stoi(
                       body.substr(yPos + 4, body.find("}", yPos) - yPos - 4));
 
+                  // Limpiar todos los objetivos personales primero
+                  kernel_.getRobotManager().clearAllPersonalGoals();
+                  
                   kernel_.getEnvironment().setGoal(Point(x, y));
                   res.set_content("{\"success\":true}", "application/json");
                 } else {
@@ -168,6 +171,116 @@ void WebServer::serverLoop() {
                 res.set_header("Access-Control-Allow-Origin", "*");
               });
 
+  // API: Agregar nuevo robot
+  server.Post("/api/robot",
+              [this](const httplib::Request &req, httplib::Response &res) {
+                std::string body = req.body;
+                int x = -1, y = -1;
+                
+                size_t xPos = body.find("\"x\":");
+                size_t yPos = body.find("\"y\":");
+
+                if (xPos != std::string::npos && yPos != std::string::npos) {
+                  x = std::stoi(body.substr(xPos + 4, body.find(",", xPos) - xPos - 4));
+                  y = std::stoi(body.substr(yPos + 4, body.find("}", yPos) - yPos - 4));
+                }
+
+                // Si no se especifican coordenadas o son inválidas, usar posición aleatoria
+                if (x < 0 || y < 0) {
+                   // Usar lógica simple para posición aleatoria segura
+                   auto& env = kernel_.getEnvironment();
+                   int width = env.getWidth();
+                   int height = env.getHeight();
+                   
+                   // Intentar encontrar una posición libre (máx 50 intentos)
+                   bool found = false;
+                   for(int i=0; i<50; ++i) {
+                       int tx = 5 + (rand() % (width - 10));
+                       int ty = 5 + (rand() % (height - 10));
+                       if(env.isPositionFree(Point(tx, ty))) {
+                           x = tx;
+                           y = ty;
+                           found = true;
+                           break;
+                       }
+                   }
+                   // Fallback si no encuentra (aunque improbable con 50 intentos en mapa vacío)
+                   if(!found) { x = 5; y = 5; }
+                }
+
+                int id = kernel_.getRobotManager().addRobot(Point(x, y));
+                
+                // Si el robot se creó exitosamente, inciarlo si el sistema no está pausado
+                if (id > 0) {
+                    auto info = kernel_.getRobotManager().getRobotInfo(id);
+                    if (info && info->robot) {
+                         info->robot->start();
+                    }
+                }
+
+                std::string response = "{\"success\":true,\"id\":" + std::to_string(id) + "}";
+                res.set_content(response, "application/json");
+                res.set_header("Access-Control-Allow-Origin", "*");
+              });
+
+  // API: Eliminar robot
+  server.Post("/api/robot/delete",
+              [this](const httplib::Request &req, httplib::Response &res) {
+                std::string body = req.body;
+                int id = -1;
+                
+                size_t idPos = body.find("\"id\":");
+                if (idPos != std::string::npos) {
+                   id = std::stoi(body.substr(idPos + 5, body.find("}", idPos) - idPos - 5));
+                }
+
+                bool success = false;
+                if (id > 0) {
+                    success = kernel_.getRobotManager().removeRobot(id);
+                } else {
+                    // Si no se pasa ID, borrar el último (lógica simplificada para botón "Eliminar")
+                    auto ids = kernel_.getRobotManager().getRobotIds();
+                    if (!ids.empty()) {
+                        // Borrar el último (mayor ID usualmente si es secuencial)
+                        int lastId = ids.back();
+                        // No borrar el robot 1 para evitar quedar sin robots (opcional)
+                        if (lastId > 1) {
+                             success = kernel_.getRobotManager().removeRobot(lastId);
+                        }
+                    }
+                }
+
+                std::string response = "{\"success\":" + std::string(success ? "true" : "false") + "}";
+                res.set_content(response, "application/json");
+                res.set_header("Access-Control-Allow-Origin", "*");
+              });
+
+  // API: Establecer objetivo específico para un robot
+  server.Post("/api/robot/goal",
+              [this](const httplib::Request &req, httplib::Response &res) {
+                std::string body = req.body;
+                int id = -1, x = -1, y = -1;
+                
+                size_t idPos = body.find("\"id\":");
+                size_t xPos = body.find("\"x\":");
+                size_t yPos = body.find("\"y\":");
+
+                if (idPos != std::string::npos && xPos != std::string::npos && yPos != std::string::npos) {
+                  id = std::stoi(body.substr(idPos + 5, body.find(",", idPos) - idPos - 5));
+                  x = std::stoi(body.substr(xPos + 4, body.find(",", xPos) - xPos - 4));
+                  y = std::stoi(body.substr(yPos + 4, body.find("}", yPos) - yPos - 4));
+                }
+
+                bool success = false;
+                if (id > 0 && x >= 0 && y >= 0) {
+                     success = kernel_.getRobotManager().setRobotGoal(id, Point(x, y));
+                }
+
+                std::string response = "{\"success\":" + std::string(success ? "true" : "false") + "}";
+                res.set_content(response, "application/json");
+                res.set_header("Access-Control-Allow-Origin", "*");
+              });
+
   // API: Obtener estadísticas del sistema
   server.Get("/api/stats",
              [this](const httplib::Request &, httplib::Response &res) {
@@ -222,14 +335,18 @@ std::string WebServer::getStateJSON() {
   auto robots = robotMgr.getAllRobots();
   for (size_t i = 0; i < robots.size(); i++) {
     if (robots[i] && robots[i]->robot) {
-      Point pos = robots[i]->robot->getPosition();
+      auto info = robots[i]; // Use a more convenient name
       json << "{";
-      json << "\"id\":" << robots[i]->id << ",";
-      json << "\"x\":" << pos.x << ",";
-      json << "\"y\":" << pos.y << ",";
-      json << "\"state\":\"" << static_cast<int>(robots[i]->currentState)
-           << "\",";
-      json << "\"obstaclesAvoided\":" << robots[i]->obstaclesAvoided;
+      json << "\"id\":" << info->id << ",";
+      json << "\"x\":" << info->robot->getPosition().x << ",";
+      json << "\"y\":" << info->robot->getPosition().y << ",";
+      json << "\"state\":\"" << static_cast<int>(info->currentState) << "\",";
+      json << "\"obstaclesAvoided\":" << info->obstaclesAvoided << ",";
+      json << "\"active\":" << (info->isActive ? "true" : "false") << ",";
+      // Incluir info del objetivo
+      json << "\"goalX\":" << info->currentGoal.x << ",";
+      json << "\"goalY\":" << info->currentGoal.y << ",";
+      json << "\"hasPersonalGoal\":" << (info->hasPersonalGoal ? "true" : "false");
       json << "}";
       if (i < robots.size() - 1)
         json << ",";

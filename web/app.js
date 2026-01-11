@@ -113,6 +113,26 @@ function handleCanvasClick(event) {
         return;
     }
 
+    // Verificar si click en robot
+    let clickedRobotId = -1;
+    if (state.robots) {
+        for (const robot of state.robots) {
+            if (robot.x === gridX && robot.y === gridY) {
+                clickedRobotId = robot.id;
+                break;
+            }
+        }
+    }
+
+    if (clickedRobotId !== -1) {
+        // Seleccionar robot
+        selectedRobotId = clickedRobotId;
+        console.log(`Robot ${selectedRobotId} seleccionado`);
+        addEvent('success', `Robot ${selectedRobotId} seleccionado`);
+        renderGrid(); // Redibujar para mostrar selección
+        return;
+    }
+
     // Validar que no sea un obstáculo
     if (state.grid && state.grid.cells[gridY][gridX] === 1) {
         console.warn(`No se puede colocar objetivo en obstáculo en (${gridX}, ${gridY})`);
@@ -120,9 +140,39 @@ function handleCanvasClick(event) {
         return;
     }
 
-    // Establecer como objetivo
-    console.log(`✅ Estableciendo meta en grid: (${gridX}, ${gridY})`);
-    setGoal(gridX, gridY);
+    // Si hay un robot seleccionado, establecer su objetivo personal
+    if (selectedRobotId !== -1) {
+        setRobotGoal(selectedRobotId, gridX, gridY);
+    } else {
+        // Si no, establecer objetivo global
+        setGoal(gridX, gridY);
+    }
+}
+
+let selectedRobotId = -1;
+
+async function setRobotGoal(robotId, x, y) {
+    try {
+        const response = await fetch(API_BASE + '/api/robot/goal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: robotId, x, y })
+        });
+
+        if (response.ok) {
+            console.log(`Objetivo personal para Robot ${robotId} en (${x}, ${y})`);
+            addEvent('success', `R${robotId} -> Objetivo (${x}, ${y})`);
+            // Deseleccionar después de asignar
+            selectedRobotId = -1;
+            renderGrid();
+        } else {
+            console.error('Error setting robot goal');
+            addEvent('error', `Error al asignar objetivo a R${robotId}`);
+        }
+    } catch (error) {
+        console.error('Error setting robot goal:', error);
+        addEvent('error', 'Error de conexión');
+    }
 }
 
 // ============================================
@@ -165,8 +215,11 @@ async function setGoal(x, y) {
         });
 
         if (response.ok) {
-            console.log(`Objetivo establecido en (${x}, ${y})`);
-            addEvent('success', `Objetivo establecido en (${x}, ${y})`);
+            console.log(`Objetivo global establecido en (${x}, ${y})`);
+            addEvent('success', `🌐 Objetivo global (${x}, ${y}) - Todos los robots`);
+            // Deseleccionar cualquier robot seleccionado
+            selectedRobotId = -1;
+            renderGrid();
         } else {
             console.error('Error: API returned non-OK status');
             addEvent('error', 'Error al establecer objetivo');
@@ -250,6 +303,56 @@ async function resetRobot() {
     } catch (error) {
         console.error('Error resetting robot:', error);
         addEvent('error', 'Error al reiniciar sistema');
+    }
+}
+
+async function addRobot() {
+    try {
+        // Enviar petición sin coordenadas para usar las aleatorias del backend
+        const response = await fetch(API_BASE + '/api/robot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`Robot agregado: ID ${data.id}`);
+            addEvent('success', `Nuevo robot agregado (ID: ${data.id})`);
+            fetchState(); // Actualizar estado inmediatamente
+        } else {
+            addEvent('error', 'Error al agregar robot');
+        }
+    } catch (error) {
+        console.error('Error adding robot:', error);
+        addEvent('error', 'Error de conexión');
+    }
+}
+
+async function removeRobot() {
+    try {
+        // Eliminar el último robot
+        const response = await fetch(API_BASE + '/api/robot/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}) // Sin ID para eliminar el último
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                console.log('Robot eliminado');
+                addEvent('warning', 'Robot eliminado del sistema');
+                fetchState(); // Actualizar estado inmediatamente
+            } else {
+                addEvent('error', 'No se pudo eliminar robot');
+            }
+        } else {
+            addEvent('error', 'Error al eliminar robot');
+        }
+    } catch (error) {
+        console.error('Error removing robot:', error);
+        addEvent('error', 'Error de conexión');
     }
 }
 
@@ -458,7 +561,55 @@ function renderGrid() {
         }
     }
 
-    // Render goal
+    // Render robot goals
+    const robotColors = [
+        '#00ffcc', // Cían Brillante
+        '#ffdd00', // Amarillo Oro
+        '#ff3399', // Hot Pink
+        '#00ccff', // Azul Cielo
+        '#66ff33', // Verde Lima
+        '#ff6600'  // Naranja Vivo
+    ];
+
+    if (state.robots) {
+        state.robots.forEach(robot => {
+            const color = robotColors[(robot.id - 1) % robotColors.length];
+
+            // Si tiene objetivo personal, dibujarlo con su color
+            if (robot.hasPersonalGoal) {
+                const gx = robot.goalX;
+                const gy = robot.goalY;
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(
+                    gx * cellSize + cellSize / 2,
+                    gy * cellSize + cellSize / 2,
+                    cellSize / 2.5,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+
+                // Línea guión hacia el objetivo si está seleccionado
+                if (robot.id === selectedRobotId) {
+                    ctx.strokeStyle = color;
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(robot.x * cellSize + cellSize / 2, robot.y * cellSize + cellSize / 2);
+                    ctx.lineTo(gx * cellSize + cellSize / 2, gy * cellSize + cellSize / 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        });
+    }
+
+    // Render global goal (always if it exists, as fallback/common goal)
+    // Only draw it if no robot is selected OR if it's the active shared goal
+    // To simplify, we always draw it, but maybe smaller? Or same.
+    // Let's keep it as is.
     if (state.goal) {
         renderGoal(state.goal.x, state.goal.y);
     }
@@ -535,6 +686,86 @@ function renderRobot(x, y, id) {
     }
 }
 
+// ============================================
+// Robot Selection Buttons
+// ============================================
+function updateRobotButtons() {
+    const container = document.getElementById('robotSelectionButtons');
+    if (!container) return;
+
+    if (!state.robots || state.robots.length === 0) {
+        container.innerHTML = '<div style="color: #6a6a7a; font-size: 12px; text-align: center;">No hay robots</div>';
+        return;
+    }
+
+    // Check if we need to full rebuild (different count or IDs could be handled better, but count is a quick check)
+    // For simplicity and robustness, we'll reconcile by ID
+    const existingButtons = Array.from(container.children);
+    const existingIds = existingButtons.map(btn => parseInt(btn.dataset.robotId) || -1);
+    const newIds = state.robots.map(r => r.id);
+
+    // Simple arrays comparison
+    const needsRebuild = existingIds.length !== newIds.length || !existingIds.every((val, index) => val === newIds[index]);
+
+    if (needsRebuild) {
+        container.innerHTML = '';
+        state.robots.forEach(robot => {
+            const btn = document.createElement('button');
+            btn.className = 'robot-select-btn';
+            btn.dataset.robotId = robot.id; // Store ID for reconciliation
+            btn.onclick = () => selectRobotById(robot.id);
+
+            // Content structure
+            btn.innerHTML = `
+                <span class="robot-id">Robot ${robot.id}</span>
+                <span class="robot-pos">(${robot.x}, ${robot.y})</span>
+            `;
+
+            if (robot.id === selectedRobotId) {
+                btn.classList.add('selected');
+            }
+            container.appendChild(btn);
+        });
+    } else {
+        // Just update values
+        state.robots.forEach((robot, index) => {
+            const btn = container.children[index];
+            if (btn) {
+                // Update selection state
+                if (robot.id === selectedRobotId) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+
+                // Update position text only if changed
+                const posSpan = btn.querySelector('.robot-pos');
+                const newText = `(${robot.x}, ${robot.y})`;
+                if (posSpan && posSpan.textContent !== newText) {
+                    posSpan.textContent = newText;
+                }
+            }
+        });
+    }
+}
+
+function selectRobotById(robotId) {
+    selectedRobotId = robotId;
+    console.log(`Robot ${robotId} seleccionado`);
+    addEvent('success', `Robot ${robotId} seleccionado`);
+    updateRobotButtons(); // Actualizar visual
+    renderGrid(); // Mostrar selección en el grid
+}
+
+function deselectRobot() {
+    if (selectedRobotId !== -1) {
+        addEvent('success', 'Robot deseleccionado');
+    }
+    selectedRobotId = -1;
+    updateRobotButtons();
+    renderGrid();
+}
+
 function drawGridLines() {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 0.5;
@@ -606,6 +837,7 @@ async function startPolling() {
         await fetchState();
         const stats = await fetchStats();
         updateStatsUI(stats);
+        updateRobotButtons(); // Actualizar botones de selección
     }
 
     // Initial fetch

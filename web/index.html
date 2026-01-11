@@ -57,6 +57,30 @@
                 </div>
             </div>
 
+            <!-- Control de Robots -->
+            <div class="control-card">
+                <h3 class="card-title">🤖 GESTIÓN DE ROBOTS</h3>
+                <div class="control-grid">
+                    <button class="control-btn btn-primary" onclick="addRobot()">
+                        ➕ Agregar Robot
+                    </button>
+                    <button class="control-btn btn-danger" onclick="removeRobot()">
+                        ➖ Eliminar Robot
+                    </button>
+                </div>
+            </div>
+
+            <!-- Selección de Robots -->
+            <div class="control-card">
+                <h3 class="card-title">🎯 SELECCIONAR ROBOT</h3>
+                <div id="robotSelectionButtons" class="robot-buttons">
+                    <!-- Botones generados dinámicamente -->
+                </div>
+                <button class="control-btn btn-secondary" onclick="deselectRobot()" style="margin-top: 12px;">
+                    ✖ Deseleccionar
+                </button>
+            </div>
+
             <!-- Statistics Dashboard -->
             <div class="stats-section">
                 <h3 class="card-title">📊 ESTADÍSTICAS</h3>
@@ -120,7 +144,8 @@
         <span>💖</span>
     </footer>
 
-    <script src="app.js"></script>
+    <!-- App Script -->
+    <script src="app.js?v=2.2"></script>
 </body>
 
 </html>

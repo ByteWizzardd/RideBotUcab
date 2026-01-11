@@ -29,6 +29,10 @@ struct RobotInfo {
     std::chrono::system_clock::time_point lastUpdateTime;
     bool isActive;
     
+    // Goal info
+    Point currentGoal;
+    bool hasPersonalGoal;
+    
     RobotInfo(int robotId, std::unique_ptr<Robot> robotPtr, Point home)
         : id(robotId)
         , robot(std::move(robotPtr))
@@ -42,6 +46,8 @@ struct RobotInfo {
         , obstaclesAvoided(0)
         , lastUpdateTime(std::chrono::system_clock::now())
         , isActive(true)
+        , currentGoal(home)
+        , hasPersonalGoal(false)
     {}
 };
 
@@ -63,6 +69,12 @@ public:
     // Asignación de tareas
     bool assignTask(int robotId, std::shared_ptr<Task> task);
     void unassignTask(int robotId);
+
+    // Asignar objetivo manual específico a un robot
+    bool setRobotGoal(int robotId, const Point& goal);
+    
+    // Limpiar todos los objetivos personales (volver a usar objetivo global)
+    void clearAllPersonalGoals();
     
     // Consultas
     size_t getRobotCount() const;

@@ -42,6 +42,11 @@ public:
   void stop();
 
   /**
+   * @brief Establece la posición del robot (usado para inicialización)
+   */
+  void setPosition(const Point &pos);
+
+  /**
    * @brief Obtiene el estado actual del robot
    */
   State getState() const;
@@ -54,17 +59,56 @@ public:
   /**
    * @brief Retorna el número de celdas que el robot ha recorrido
    */
-  size_t getCellsTraveled() const { return positionHistory_.size(); }
+  size_t getCellsTraveled() const { return cellsTraveled_; }
   
   /**
    * @brief Retorna el número de obstáculos esquivados (recalculaciones de ruta)
    */
   int getObstaclesAvoided() const { return obstaclesAvoided_; }
 
+  /**
+   * @brief Establece un objetivo personal para este robot
+   * @param p Coordenada del objetivo
+   */
+  void setPersonalGoal(OSBot::Point p) {
+      personalGoal_ = p;
+      hasPersonalGoal_ = true;
+      // Forzar reevaluación inmediata
+      if (currentState_ == State::REACHED_GOAL || currentState_ == State::IDLE) {
+          currentState_ = State::NAVIGATING;
+      }
+  }
+
+  /**
+   * @brief Limpia el objetivo personal (vuelve a usar el global)
+   */
+  void clearPersonalGoal() {
+      hasPersonalGoal_ = false;
+  }
+  
+  /**
+   * @brief Obtiene el objetivo actual (personal o global)
+   */
+  OSBot::Point getGoal() const {
+      if (hasPersonalGoal_) {
+          return personalGoal_;
+      }
+      return environment_.getGoal();
+  }
+  
+  /**
+   * @brief Verifica si el robot tiene un objetivo personal asignado
+   */
+  bool hasPersonalGoal() const { return hasPersonalGoal_; }
+
 private:
   Environment &environment_;
   Point currentPosition_;
   State currentState_;
+
+  // Objetivo personal
+  Point personalGoal_;
+  bool hasPersonalGoal_;
 
   // Control de hilos
   std::unique_ptr<std::thread> robotThread_;
@@ -108,6 +152,7 @@ private:
   std::vector<Point> plannedPath_;    // Ruta calculada por A*
   size_t pathIndex_;                  // Índice actual en plannedPath_
   int obstaclesAvoided_;              // Contador de obstáculos esquivados
+  size_t cellsTraveled_;              // Contador total de celdas recorridas
 
   static constexpr size_t MAX_HISTORY = 10;
   static constexpr size_t STUCK_THRESHOLD = 3; // Repetir 3 veces = stuck

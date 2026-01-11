@@ -201,6 +201,112 @@ body {
     color: var(--text-primary);
 }
 
+/* Control de Robots */
+.control-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.control-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.control-btn {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.9em;
+}
+
+.btn-primary {
+    background: rgba(233, 123, 160, 0.15);
+    color: #e97ba0;
+    border: 1px solid rgba(233, 123, 160, 0.3);
+}
+
+.btn-primary:hover {
+    background: rgba(233, 123, 160, 0.25);
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: rgba(255, 80, 80, 0.15);
+    color: #ff5050;
+    border: 1px solid rgba(255, 80, 80, 0.3);
+}
+
+.btn-danger:hover {
+    background: rgba(255, 80, 80, 0.25);
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background: rgba(160, 160, 180, 0.15);
+    color: #a8a8b8;
+    border: 1px solid rgba(160, 160, 180, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(160, 160, 180, 0.25);
+    transform: translateY(-2px);
+}
+
+/* Robot Selection Buttons */
+.robot-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.robot-select-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.robot-select-btn:hover {
+    background: rgba(233, 123, 160, 0.15);
+    border-color: rgba(233, 123, 160, 0.3);
+    transform: translateX(4px);
+}
+
+.robot-select-btn.selected {
+    background: rgba(233, 123, 160, 0.25);
+    border-color: #e97ba0;
+    box-shadow: 0 0 8px rgba(233, 123, 160, 0.3);
+}
+
+.robot-id {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.robot-pos {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
 /* Statistics Section */
 .stats-section {
     background: var(--bg-secondary);
