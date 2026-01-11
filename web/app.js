@@ -33,12 +33,17 @@ let statsHistory = {
     maxPoints: 20
 };
 
+// Event logging
+let eventCount = 0;
+const MAX_EVENTS = 100;
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
     initCanvas();
     initControls();
     initStatsChart();
     startPolling();
+    addEvent('success', 'Sistema iniciado correctamente');
 });
 
 // ============================================
@@ -124,15 +129,6 @@ function handleCanvasClick(event) {
 // Controls
 // ============================================
 function initControls() {
-    // Pause button
-    const pauseBtn = document.getElementById('pauseButton');
-    if (pauseBtn) {
-        pauseBtn.addEventListener('click', () => {
-            console.log('Pause button clicked');
-            // You can implement pause logic here if needed
-        });
-    }
-
     // Reset button
     const resetBtn = document.getElementById('resetButton');
     if (resetBtn) {
@@ -169,12 +165,15 @@ async function setGoal(x, y) {
         });
 
         if (response.ok) {
-            document.getElementById('goalX').value = x;
-            document.getElementById('goalY').value = y;
             console.log(`Objetivo establecido en (${x}, ${y})`);
+            addEvent('success', `Objetivo establecido en (${x}, ${y})`);
+        } else {
+            console.error('Error: API returned non-OK status');
+            addEvent('error', 'Error al establecer objetivo');
         }
     } catch (error) {
         console.error('Error setting goal:', error);
+        addEvent('error', 'Error de conexión al establecer objetivo');
     }
 }
 
@@ -242,12 +241,15 @@ async function resetRobot() {
 
         if (response.ok) {
             console.log('✅ Sistema reiniciado - Robot reposicionado');
+            addEvent('warning', 'Sistema reiniciado - Robot reposicionado');
             fetchState(); // Actualizar inmediatamente
         } else {
             console.error('Error al reiniciar');
+            addEvent('error', 'Error al reiniciar sistema');
         }
     } catch (error) {
         console.error('Error resetting robot:', error);
+        addEvent('error', 'Error al reiniciar sistema');
     }
 }
 
@@ -255,8 +257,63 @@ async function resetRobot() {
 // Statistics Dashboard
 // ============================================
 function initStatsChart() {
-    // Chart.js not included, skip initialization
-    return;
+    const ctx = document.getElementById('statsChart');
+    if (!ctx) {
+        console.warn('Stats chart canvas not found');
+        return;
+    }
+
+    statsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Tareas Completadas',
+                data: [],
+                borderColor: '#e97ba0',
+                backgroundColor: 'rgba(233, 123, 160, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: '#e8e8f0'
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        color: '#a8a8b8'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#a8a8b8'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                }
+            },
+            animation: {
+                duration: 750
+            }
+        }
+    });
 }
 
 async function fetchStats() {
@@ -272,10 +329,58 @@ async function fetchStats() {
 }
 
 function updateStatsUI(stats) {
-    // Stats UI elements don't exist in current HTML
-    // Just log for debugging
-    if (stats) {
-        console.log('Stats received:', stats);
+    if (!stats) return;
+
+    // Update stat cards
+    const completedTasksEl = document.getElementById('statCompletedTasks');
+    const cellsTraveledEl = document.getElementById('statCellsTraveled');
+    const distanceEl = document.getElementById('statDistance');
+    const efficiencyEl = document.getElementById('statEfficiency');
+
+    if (completedTasksEl) completedTasksEl.textContent = stats.completedTasks || 0;
+    if (cellsTraveledEl) cellsTraveledEl.textContent = stats.cellsTraveled || 0;
+    if (distanceEl) distanceEl.textContent = ((stats.totalDistance || 0) / 1000).toFixed(2) + ' km';
+    if (efficiencyEl) efficiencyEl.textContent = (stats.efficiency || 0).toFixed(1) + '%';
+
+    // Update additional stats
+    const robotsEl = document.getElementById('statRobots');
+    const uptimeEl = document.getElementById('statUptime');
+
+    if (robotsEl) {
+        robotsEl.textContent = `${stats.robotsActive || 0}/${stats.totalRobots || 0}`;
+    }
+
+    // Format uptime
+    if (uptimeEl) {
+        const uptime = stats.uptime || 0;
+        const minutes = Math.floor(uptime / 60);
+        const seconds = uptime % 60;
+        uptimeEl.textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    }
+
+    // Update chart
+    if (statsChart) {
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // Add new data point
+        statsHistory.labels.push(timeLabel);
+        statsHistory.completed.push(stats.completedTasks || 0);
+
+        // Keep only last maxPoints
+        if (statsHistory.labels.length > statsHistory.maxPoints) {
+            statsHistory.labels.shift();
+            statsHistory.completed.shift();
+        }
+
+        // Update chart data
+        statsChart.data.labels = statsHistory.labels;
+        statsChart.data.datasets[0].data = statsHistory.completed;
+        statsChart.update('none'); // Update without animation for smoother real-time
     }
 }
 
@@ -451,6 +556,46 @@ function drawGridLines() {
         ctx.lineTo(gridWidth * cellSize, py);
         ctx.stroke();
     }
+}
+
+// ============================================
+// Event Logging
+// ============================================
+function addEvent(type, message) {
+    const eventsLog = document.getElementById('eventsLog');
+    if (!eventsLog) return;
+
+    // Create event item
+    const eventItem = document.createElement('div');
+    eventItem.className = `event-item event-${type}`;
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    eventItem.innerHTML = `
+        <span class="event-time">${timeStr}</span>
+        <span class="event-message">${message}</span>
+    `;
+
+    // Add to log
+    eventsLog.appendChild(eventItem);
+    eventCount++;
+
+    // Remove old events if exceeding max
+    if (eventCount > MAX_EVENTS) {
+        const firstEvent = eventsLog.firstChild;
+        if (firstEvent) {
+            eventsLog.removeChild(firstEvent);
+            eventCount--;
+        }
+    }
+
+    // Auto-scroll to bottom
+    eventsLog.scrollTop = eventsLog.scrollHeight;
 }
 
 // ============================================

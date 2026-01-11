@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OS-BOT - Sistema de Navegación</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
@@ -35,7 +36,6 @@
                     </div>
                 </div>
 
-                <button class="pause-button" id="pauseButton">PAUSA</button>
                 <button class="reset-button" id="resetButton">🔄 REINICIAR</button>
             </div>
 
@@ -54,6 +54,42 @@
                         <span class="info-label">Obstáculos Esquivados:</span>
                         <span class="info-value" id="obstaclesAvoided">0</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Statistics Dashboard -->
+            <div class="stats-section">
+                <h3 class="card-title">📊 ESTADÍSTICAS</h3>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="statCompletedTasks">0</div>
+                        <div class="stat-card-label">Tareas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="statCellsTraveled">0</div>
+                        <div class="stat-card-label">Cuadros</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="statDistance">0 km</div>
+                        <div class="stat-card-label">Distancia</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="statEfficiency">0%</div>
+                        <div class="stat-card-label">Eficiencia</div>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="chart-container">
+                    <canvas id="statsChart"></canvas>
+                </div>
+
+                <!-- Additional Stats -->
+                <div class="additional-stats">
+                    <span>🤖 <strong id="statRobots">0/0</strong></span>
+                    <span>⏱️ <strong id="statUptime">0s</strong></span>
                 </div>
             </div>
         </aside>
