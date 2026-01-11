@@ -1,5 +1,7 @@
 #include "application/RobotManager.h"
 #include <algorithm>
+#include <random>
+#include <iostream>
 
 namespace OSBot {
 
@@ -134,6 +136,9 @@ void RobotManager::update() {
       // Update cells traveled from robot's position history
       info->cellsTraveled = info->robot->getCellsTraveled();
       
+      // Update obstacles avoided
+      info->obstaclesAvoided = info->robot->getObstaclesAvoided();
+      
       // Distance is approximately cells traveled (each cell ~= 1 meter)
       info->totalDistanceTraveled = static_cast<double>(info->cellsTraveled);
       
@@ -177,6 +182,75 @@ int RobotManager::findAvailableRobot() const {
         }
     }
     return -1; // No hay robots disponibles
+}
+
+void RobotManager::resetRobotPosition() {
+    std::lock_guard<std::mutex> lock(robotsMutex_);
+    
+    // Regenerar obstáculos aleatorios (25% del área)
+    environment_.generateRandomObstacles(25);
+    std::cout << "[RobotManager] Obstáculos regenerados" << std::endl;
+    
+    // Obtener dimensiones del entorno
+    int width = environment_.getWidth();
+    int height = environment_.getHeight();
+    
+    // Generar posición aleatoria válida (evitando bordes)
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distX(2, width - 3);
+    std::uniform_int_distribution<> distY(2, height - 3);
+    
+    for (auto& [id, info] : robots_) {
+        if (info && info->robot) {
+            // Detener el robot actual
+            info->robot->stop();
+            
+            // Generar nueva posición aleatoria
+            Point newPos;
+            bool validPosition = false;
+            int attempts = 0;
+            
+            while (!validPosition && attempts < 100) {
+                newPos.x = distX(gen);
+                newPos.y = distY(gen);
+                
+                // Verificar que la posición esté libre
+                if (environment_.isPositionFree(newPos)) {
+                    validPosition = true;
+                }
+                attempts++;
+            }
+            
+            if (!validPosition) {
+                // Fallback a posición por defecto
+                newPos = Point(5, 5);
+            }
+            
+            // Crear nuevo robot en la nueva posición
+            auto newRobot = std::make_unique<Robot>(environment_);
+            info->robot = std::move(newRobot);
+            info->homePosition = newPos;
+            
+            // Resetear estadísticas
+            info->tasksCompleted = 0;
+            info->tasksFailed = 0;
+            info->totalDistanceTraveled = 0.0;
+            info->cellsTraveled = 0;
+            info->obstaclesAvoided = 0;
+            info->currentTaskId = -1;
+            info->currentState = State::IDLE;
+            
+            // Actualizar posición del robot en el entorno
+            environment_.updateRobotPosition(newPos);
+            
+            // Reiniciar el robot
+            info->robot->start();
+            
+            std::cout << "[RobotManager] Robot " << id << " reposicionado a (" 
+                      << newPos.x << ", " << newPos.y << ")" << std::endl;
+        }
+    }
 }
 
 } // namespace OSBot

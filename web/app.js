@@ -82,9 +82,19 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    // Calcular la escala entre el tamaño visual y el tamaño interno del canvas
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Ajustar las coordenadas del mouse a las coordenadas del canvas interno
+    const canvasX = x * scaleX;
+    const canvasY = y * scaleY;
+
     // Calcular posición en el grid usando cellSize real
-    const gridX = Math.floor(x / cellSize);
-    const gridY = Math.floor(y / cellSize);
+    const gridX = Math.floor(canvasX / cellSize);
+    const gridY = Math.floor(canvasY / cellSize);
+
+    console.log(`Click: mouse(${x.toFixed(0)}, ${y.toFixed(0)}) -> canvas(${canvasX.toFixed(0)}, ${canvasY.toFixed(0)}) -> grid(${gridX}, ${gridY})`);
 
     // Validar que esté dentro del grid
     if (gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight) {
@@ -106,7 +116,7 @@ function handleCanvasClick(event) {
     }
 
     // Establecer como objetivo
-    console.log(`Click en grid: (${gridX}, ${gridY})`);
+    console.log(`✅ Estableciendo meta en grid: (${gridX}, ${gridY})`);
     setGoal(gridX, gridY);
 }
 
@@ -114,40 +124,23 @@ function handleCanvasClick(event) {
 // Controls
 // ============================================
 function initControls() {
-    // Goal button
-    const setGoalBtn = document.getElementById('setGoalBtn');
-    setGoalBtn.addEventListener('click', () => {
-        const x = parseInt(document.getElementById('goalX').value);
-        const y = parseInt(document.getElementById('goalY').value);
-        setGoal(x, y);
-    });
+    // Pause button
+    const pauseBtn = document.getElementById('pauseButton');
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+            console.log('Pause button clicked');
+            // You can implement pause logic here if needed
+        });
+    }
 
-    // Edit mode button
-    const editModeBtn = document.getElementById('editModeBtn');
-    const editorControls = document.getElementById('editorControls');
-
-    editModeBtn.addEventListener('click', () => {
-        editMode = !editMode;
-        if (editMode) {
-            editModeBtn.textContent = '✅ Modo Edición Activo';
-            editModeBtn.classList.add('active');
-            editorControls.style.display = 'block';
-            canvas.style.cursor = 'crosshair';
-        } else {
-            editModeBtn.textContent = '🖊️ Activar Modo Edición';
-            editModeBtn.classList.remove('active');
-            editorControls.style.display = 'none';
-            canvas.style.cursor = 'pointer';
-        }
-    });
-
-    // Clear obstacles button
-    const clearObstaclesBtn = document.getElementById('clearObstaclesBtn');
-    clearObstaclesBtn.addEventListener('click', clearAllObstacles);
-
-    // Random obstacles button
-    const randomObstaclesBtn = document.getElementById('randomObstaclesBtn');
-    randomObstaclesBtn.addEventListener('click', () => generateRandomObstacles(25));
+    // Reset button
+    const resetBtn = document.getElementById('resetButton');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', async () => {
+            console.log('Reset button clicked');
+            await resetRobot();
+        });
+    }
 }
 
 // ============================================
@@ -241,49 +234,29 @@ async function generateRandomObstacles(percentage) {
     }
 }
 
+async function resetRobot() {
+    try {
+        const response = await fetch(API_BASE + '/api/reset', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            console.log('✅ Sistema reiniciado - Robot reposicionado');
+            fetchState(); // Actualizar inmediatamente
+        } else {
+            console.error('Error al reiniciar');
+        }
+    } catch (error) {
+        console.error('Error resetting robot:', error);
+    }
+}
+
 // ============================================
 // Statistics Dashboard
 // ============================================
 function initStatsChart() {
-    const ctx = document.getElementById('statsChart');
-    if (!ctx) return;
-
-    statsChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Tareas Completadas',
-                data: [],
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            },
-            animation: {
-                duration: 750
-            }
-        }
-    });
+    // Chart.js not included, skip initialization
+    return;
 }
 
 async function fetchStats() {
@@ -299,50 +272,10 @@ async function fetchStats() {
 }
 
 function updateStatsUI(stats) {
-    if (!stats) return;
-
-    // Update stat cards
-    document.getElementById('statCompletedTasks').textContent = stats.completedTasks || 0;
-    document.getElementById('statCellsTraveled').textContent = stats.cellsTraveled || 0;
-    document.getElementById('statDistance').textContent =
-        ((stats.totalDistance || 0) / 1000).toFixed(2) + ' km';
-    document.getElementById('statEfficiency').textContent =
-        (stats.efficiency || 0).toFixed(1) + '%';
-
-    // Update additional stats
-    document.getElementById('statRobots').textContent =
-        `${stats.robotsActive || 0}/${stats.totalRobots || 0}`;
-
-    // Format uptime
-    const uptime = stats.uptime || 0;
-    const minutes = Math.floor(uptime / 60);
-    const seconds = uptime % 60;
-    document.getElementById('statUptime').textContent =
-        minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-
-    // Update chart
-    if (statsChart) {
-        const now = new Date();
-        const timeLabel = now.toLocaleTimeString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-
-        // Add new data point
-        statsHistory.labels.push(timeLabel);
-        statsHistory.completed.push(stats.completedTasks || 0);
-
-        // Keep only last maxPoints
-        if (statsHistory.labels.length > statsHistory.maxPoints) {
-            statsHistory.labels.shift();
-            statsHistory.completed.shift();
-        }
-
-        // Update chart data
-        statsChart.data.labels = statsHistory.labels;
-        statsChart.data.datasets[0].data = statsHistory.completed;
-        statsChart.update('none'); // Update without animation for smoother real-time
+    // Stats UI elements don't exist in current HTML
+    // Just log for debugging
+    if (stats) {
+        console.log('Stats received:', stats);
     }
 }
 
@@ -358,10 +291,10 @@ function updateUI() {
         gridWidth = state.grid.width;
         gridHeight = state.grid.height;
 
-        document.getElementById('gridSize').textContent =
-            `Grid: ${gridWidth}x${gridHeight}`;
-        document.getElementById('currentGridSize').textContent =
-            `${gridWidth}x${gridHeight}`;
+        const gridSizeEl = document.getElementById('gridSize');
+        if (gridSizeEl) {
+            gridSizeEl.textContent = `Visualización ${gridWidth}x${gridHeight}`;
+        }
 
         // Resize canvas si cambió el tamaño del grid
         if (oldWidth !== gridWidth || oldHeight !== gridHeight) {
@@ -369,14 +302,31 @@ function updateUI() {
         }
     }
 
-    // Update robot count
-    document.getElementById('robotCount').textContent = state.robots.length;
+    // Update robot percentage display
+    const robotsPercentEl = document.getElementById('robotsPercent');
+    if (robotsPercentEl && state.robots && state.robots.length > 0) {
+        robotsPercentEl.textContent = `${state.robots.length} activo(s)`;
+    }
 
-    // Update last update time
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString();
-    document.getElementById('lastUpdate').textContent =
-        `Última actualización: ${timeStr}`;
+    // Update positions if we have robot data
+    if (state.robots && state.robots.length > 0) {
+        const robot = state.robots[0];
+        const startPosEl = document.getElementById('startPos');
+        const endPosEl = document.getElementById('endPos');
+        const obstaclesAvoidedEl = document.getElementById('obstaclesAvoided');
+
+        if (startPosEl) {
+            startPosEl.textContent = `(${robot.x}, ${robot.y})`;
+        }
+
+        if (endPosEl && state.goal) {
+            endPosEl.textContent = `(${state.goal.x}, ${state.goal.y})`;
+        }
+
+        if (obstaclesAvoidedEl) {
+            obstaclesAvoidedEl.textContent = robot.obstaclesAvoided || 0;
+        }
+    }
 }
 
 // ============================================
@@ -421,17 +371,17 @@ function renderCell(x, y, type) {
     const px = x * cellSize;
     const py = y * cellSize;
 
-    // Colors based on cell type
+    // Colors based on cell type - Soft/Feminine theme
     // 0 = EMPTY, 1 = OBSTACLE
     switch (type) {
         case 0: // EMPTY
-            ctx.fillStyle = '#f8fafc';
+            ctx.fillStyle = '#383a4a'; // Lighter gray for visibility
             break;
         case 1: // OBSTACLE
-            ctx.fillStyle = '#334155';
+            ctx.fillStyle = '#d15278'; // Soft pink
             break;
         default:
-            ctx.fillStyle = '#f8fafc';
+            ctx.fillStyle = '#383a4a';
     }
 
     ctx.fillRect(px, py, cellSize, cellSize);
@@ -442,14 +392,14 @@ function renderGoal(x, y) {
     const py = y * cellSize + cellSize / 2;
     const radius = cellSize * 0.4;
 
-    // Draw star shape for goal
-    ctx.fillStyle = '#10b981';
+    // Draw soft pink circle for goal
+    ctx.fillStyle = '#e97ba0';
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Outline
-    ctx.strokeStyle = '#059669';
+    // Soft glow outline
+    ctx.strokeStyle = '#f5a5c0';
     ctx.lineWidth = 2;
     ctx.stroke();
 }
@@ -459,20 +409,20 @@ function renderRobot(x, y, id) {
     const py = y * cellSize + cellSize / 2;
     const radius = cellSize * 0.35;
 
-    // Draw circle for robot
-    ctx.fillStyle = '#3b82f6';
+    // Draw soft pink/purple circle for robot
+    ctx.fillStyle = '#f5a5c0';
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Outline
-    ctx.strokeStyle = '#1e40af';
+    // Soft outline
+    ctx.strokeStyle = '#ffc9dc';
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Robot ID (if cell is large enough)
     if (cellSize > 15) {
-        ctx.fillStyle = 'white';
+        ctx.fillStyle = '#1a1a26';
         ctx.font = `bold ${Math.floor(cellSize * 0.4)}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -481,7 +431,7 @@ function renderRobot(x, y, id) {
 }
 
 function drawGridLines() {
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 0.5;
 
     // Vertical lines

@@ -55,6 +55,11 @@ public:
    * @brief Retorna el número de celdas que el robot ha recorrido
    */
   size_t getCellsTraveled() const { return positionHistory_.size(); }
+  
+  /**
+   * @brief Retorna el número de obstáculos esquivados (recalculaciones de ruta)
+   */
+  int getObstaclesAvoided() const { return obstaclesAvoided_; }
 
 private:
   Environment &environment_;
@@ -102,6 +107,7 @@ private:
   std::deque<Point> positionHistory_; // Últimas N posiciones
   std::vector<Point> plannedPath_;    // Ruta calculada por A*
   size_t pathIndex_;                  // Índice actual en plannedPath_
+  int obstaclesAvoided_;              // Contador de obstáculos esquivados
 
   static constexpr size_t MAX_HISTORY = 10;
   static constexpr size_t STUCK_THRESHOLD = 3; // Repetir 3 veces = stuck

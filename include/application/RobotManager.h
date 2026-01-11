@@ -25,6 +25,7 @@ struct RobotInfo {
     int tasksFailed;
     double totalDistanceTraveled;
     int cellsTraveled;
+    int obstaclesAvoided;  // Contador de obstáculos esquivados
     std::chrono::system_clock::time_point lastUpdateTime;
     bool isActive;
     
@@ -38,6 +39,7 @@ struct RobotInfo {
         , tasksFailed(0)
         , totalDistanceTraveled(0.0)
         , cellsTraveled(0)
+        , obstaclesAvoided(0)
         , lastUpdateTime(std::chrono::system_clock::now())
         , isActive(true)
     {}
@@ -75,6 +77,9 @@ public:
     // Estado
     bool isRobotAvailable(int robotId) const;
     int findAvailableRobot() const;
+    
+    // Reset
+    void resetRobotPosition();
     
 private:
     Environment& environment_;

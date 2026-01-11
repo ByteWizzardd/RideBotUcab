@@ -4,157 +4,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RideBot - Simulación de Navegación</title>
+    <title>OS-BOT - Sistema de Navegación</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header>
-            <h1>🤖 RideBot - Sistema de Navegación Multi-Robot</h1>
-            <p class="subtitle">Visualización en Tiempo Real</p>
-        </header>
-
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Canvas Section -->
-            <div class="canvas-container">
-                <canvas id="gridCanvas"></canvas>
-                <div class="canvas-info">
-                    <span id="gridSize">Grid: --x--</span>
-                    <span id="fps">FPS: --</span>
+    <div class="app-container">
+        <!-- Left Panel - System Info -->
+        <aside class="left-panel">
+            <div class="system-info-card">
+                <div class="system-header">
+                    <h1 class="system-title">OS-BOT</h1>
+                    <span class="system-version">VERSION v2.0</span>
                 </div>
+
+                <div class="system-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Estado</span>
+                        <span class="stat-value status-online" id="systemStatus">ONLINE</span>
+                    </div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">Robots</span>
+                        <span class="stat-value" id="robotsPercent">0%</span>
+                    </div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">Sensores</span>
+                        <span class="stat-value status-active" id="sensorsStatus">Activos</span>
+                    </div>
+                </div>
+
+                <button class="pause-button" id="pauseButton">PAUSA</button>
+                <button class="reset-button" id="resetButton">🔄 REINICIAR</button>
             </div>
 
-            <!-- Control Panel -->
-            <div class="control-panel">
-                <h2>Panel de Control</h2>
-
-                <!-- Status -->
-                <div class="status-section">
-                    <h3>Estado</h3>
-                    <div class="status-item">
-                        <span>Estado:</span>
-                        <span id="statusText" class="status-running">En ejecución</span>
+            <div class="info-card">
+                <h3 class="card-title">INFORMACIÓN GENERAL</h3>
+                <div class="info-content">
+                    <div class="info-item">
+                        <span class="info-label">Posición Inicial:</span>
+                        <span class="info-value" id="startPos">--</span>
                     </div>
-                    <div class="status-item">
-                        <span>Robots activos:</span>
-                        <span id="robotCount">0</span>
+                    <div class="info-item">
+                        <span class="info-label">Posición Final:</span>
+                        <span class="info-value" id="endPos">--</span>
                     </div>
-                </div>
-
-                <!-- Grid Configuration -->
-                <div class="config-section">
-                    <h3>⚙️ Configuración del Grid</h3>
-                    <div class="config-info">
-                        <p><strong>Tamaño actual:</strong> <span id="currentGridSize"
-                                style="color: #10b981; font-size: 1.2em;">60x60</span></p>
-                        <hr style="margin: 10px 0; border: none; border-top: 1px solid #e2e8f0;">
-                        <p style="margin-top: 10px;"><strong>📝 Para cambiar el tamaño:</strong></p>
-                        <ol style="font-size: 0.85em; margin-left: 20px; line-height: 1.6;">
-                            <li>Edita <code>include/domain/Global.h</code></li>
-                            <li>Cambia <code>GRID_WIDTH</code> y <code>GRID_HEIGHT</code></li>
-                            <li>Ejecuta <code>./build.sh rebuild</code></li>
-                            <li>Reinicia el servidor</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <!-- Goal Control -->
-                <div class="goal-section">
-                    <h3>Objetivo</h3>
-                    <div class="goal-inputs">
-                        <div class="input-group">
-                            <label for="goalX">X:</label>
-                            <input type="number" id="goalX" value="50" min="1">
-                        </div>
-                        <div class="input-group">
-                            <label for="goalY">Y:</label>
-                            <input type="number" id="goalY" value="30" min="1">
-                        </div>
-                        <button id="setGoalBtn" class="btn btn-secondary">Establecer Objetivo</button>
-                    </div>
-                    <p class="hint">💡 También puedes hacer click en el canvas para establecer el objetivo</p>
-                </div>
-
-                <!-- Obstacle Editor -->
-                <div class="editor-section">
-                    <h3>Editor de Obstáculos</h3>
-                    <button id="editModeBtn" class="btn btn-edit">🖊️ Activar Modo Edición</button>
-                    <div id="editorControls" class="editor-controls" style="display: none;">
-                        <p class="hint">✏️ Haz click en el grid para agregar/eliminar obstáculos</p>
-                        <button id="clearObstaclesBtn" class="btn btn-warning">🗑️ Limpiar Obstáculos</button>
-                        <button id="randomObstaclesBtn" class="btn btn-info">🎲 Generar Aleatorios (25%)</button>
-                    </div>
-                </div>
-
-                <!-- Statistics Dashboard -->
-                <div class="stats-section">
-                    <h3>📊 Estadísticas del Sistema</h3>
-
-                    <!-- Stats Cards -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value" id="statCompletedTasks">0</div>
-                            <div class="stat-label">Tareas Completadas</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statCellsTraveled">0</div>
-                            <div class="stat-label">Cuadros Recorridos</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statDistance">0 km</div>
-                            <div class="stat-label">Distancia Total</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="statEfficiency">0%</div>
-                            <div class="stat-label">Eficiencia</div>
-                        </div>
-                    </div>
-
-                    <!-- Chart -->
-                    <div class="chart-container">
-                        <canvas id="statsChart"></canvas>
-                    </div>
-
-                    <!-- Additional Stats -->
-                    <div class="additional-stats">
-                        <span>🤖 Robots: <strong id="statRobots">0/0</strong></span>
-                        <span>⏱️ Uptime: <strong id="statUptime">0s</strong></span>
-                    </div>
-                </div>
-
-                <!-- Legend -->
-                <div class="legend-section">
-                    <h3>Leyenda</h3>
-                    <div class="legend-item">
-                        <div class="legend-color robot"></div>
-                        <span>Robot</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color goal"></div>
-                        <span>Objetivo</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color obstacle"></div>
-                        <span>Obstáculo</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color empty"></div>
-                        <span>Vacío</span>
+                    <div class="info-item">
+                        <span class="info-label">Obstáculos Esquivados:</span>
+                        <span class="info-value" id="obstaclesAvoided">0</span>
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
 
-        <!-- Footer -->
-        <footer>
-            <p>RideBot v2.0 - Sistema Operativo Multi-Robot | <span id="lastUpdate">Última actualización:
-                    --:--:--</span></p>
-        </footer>
+        <!-- Center Panel - Grid -->
+        <main class="center-panel">
+            <canvas id="gridCanvas"></canvas>
+            <div class="grid-footer">
+                <span id="gridSize">Visualización v1.0</span>
+            </div>
+        </main>
+
+        <!-- Right Panel - Events Log -->
+        <aside class="right-panel">
+            <div class="events-panel">
+                <h2 class="events-title">EVENTOS</h2>
+                <div class="events-log" id="eventsLog">
+                    <!-- Events will be dynamically added here -->
+                </div>
+            </div>
+        </aside>
     </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <span>Add allergens by: Josué</span>
+        <span>🤖</span>
+        <span>💖</span>
+    </footer>
 
     <script src="app.js"></script>
 </body>

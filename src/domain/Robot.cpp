@@ -11,7 +11,7 @@ namespace OSBot {
 
 Robot::Robot(Environment &env)
     : environment_(env), currentPosition_(1, 1), currentState_(State::IDLE),
-      running_(false), pathIndex_(0) {}
+      running_(false), pathIndex_(0), obstaclesAvoided_(0) {}
 
 Robot::~Robot() { stop(); }
 
@@ -224,6 +224,9 @@ bool Robot::isStuck() const {
 }
 
 void Robot::recalculatePath() {
+  // Incrementar contador de obstáculos esquivados
+  obstaclesAvoided_++;
+  
   // Calcular ruta con A* usando el mapa real del Environment
   Route route =
       AStar::find_path(currentPosition_, environment_.getGoal(), environment_);

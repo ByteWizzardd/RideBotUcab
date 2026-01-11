@@ -72,7 +72,7 @@ void Environment::initialize() {
     getNode(width_ - 1, y)->type = CellType::OBSTACLE;
   }
 
-  // Colocar obstáculos aleatorios
+  // Colocar obstáculos aleatorios al inicio
   placeObstacles();
 
   // Colocar robot y objetivo
@@ -247,6 +247,11 @@ void Environment::updateLoop() {
     if (!running_)
       break;
 
+    // DESHABILITADO: Generación automática de obstáculos
+    // El usuario quiere control manual completo sobre los obstáculos
+    // Los obstáculos solo se deben agregar/eliminar mediante la interfaz web
+    
+    /* COMENTADO - Generación automática de obstáculos
     std::lock_guard<std::mutex> lock(mapMutex_);
 
     // Contar obstáculos actuales
@@ -278,6 +283,7 @@ void Environment::updateLoop() {
         }
       }
     }
+    */
   }
 }
 

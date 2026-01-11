@@ -160,6 +160,14 @@ void WebServer::serverLoop() {
                 res.set_header("Access-Control-Allow-Origin", "*");
               });
 
+  // API: Reiniciar - reposicionar robot aleatoriamente
+  server.Post("/api/reset",
+              [this](const httplib::Request &, httplib::Response &res) {
+                kernel_.getRobotManager().resetRobotPosition();
+                res.set_content("{\"success\":true}", "application/json");
+                res.set_header("Access-Control-Allow-Origin", "*");
+              });
+
   // API: Obtener estadísticas del sistema
   server.Get("/api/stats",
              [this](const httplib::Request &, httplib::Response &res) {
@@ -220,7 +228,8 @@ std::string WebServer::getStateJSON() {
       json << "\"x\":" << pos.x << ",";
       json << "\"y\":" << pos.y << ",";
       json << "\"state\":\"" << static_cast<int>(robots[i]->currentState)
-           << "\"";
+           << "\",";
+      json << "\"obstaclesAvoided\":" << robots[i]->obstaclesAvoided;
       json << "}";
       if (i < robots.size() - 1)
         json << ",";
