@@ -75,14 +75,13 @@ void Environment::initialize() {
   // Colocar obstáculos aleatorios al inicio
   placeObstacles();
 
-  // Colocar robot y objetivo
-  Node *robotNode = getNode(robotPosition_.x, robotPosition_.y);
-  if (robotNode)
-    robotNode->type = CellType::ROBOT;
-
+  // Colocar objetivo en el grid
   Node *goalNode = getNode(goalPosition_.x, goalPosition_.y);
   if (goalNode)
     goalNode->type = CellType::GOAL;
+    
+  // NOTA: Los robots YA NO se marcan en el grid (multi-robot fix)
+  // Las posiciones de robots se manejan en RobotManager
 }
 
 Environment::Node *Environment::getNode(int x, int y) {
@@ -178,29 +177,19 @@ bool Environment::isPositionFree(const Point &pos) const {
 }
 
 void Environment::updateRobotPosition(const Point &pos) {
-  // *** SECCIÓN CRÍTICA ***
-  // Lock para modificación del mapa compartido
-  std::lock_guard<std::mutex> lock(mapMutex_);
-
-  // Limpiar posición anterior (excepto si es el objetivo)
-  Node *oldNode = getNode(robotPosition_.x, robotPosition_.y);
-  if (oldNode && oldNode->type == CellType::ROBOT) {
-    oldNode->type = CellType::EMPTY;
+  // *** MULTI-ROBOT FIX ***
+  // Los robots YA NO escriben en el grid (CellType::ROBOT)
+  // Solo validan que la posición sea válida.
+  // El WebServer obtiene las posiciones reales desde RobotManager.
+  
+  // Validación básica de límites
+  if (pos.x < 0 || pos.x >= width_ || pos.y < 0 || pos.y >= height_) {
+    return; // Posición inválida
   }
-
-  // Actualizar posición del robot
-  robotPosition_ = pos;
-
-  // Marcar nueva posición (si no es el objetivo)
-  Node *newNode = getNode(robotPosition_.x, robotPosition_.y);
-  if (newNode) {
-    if (newNode->type != CellType::GOAL) {
-      newNode->type = CellType::ROBOT;
-    } else {
-      // Robot alcanzó el objetivo
-      newNode->type = CellType::ROBOT;
-    }
-  }
+  
+  // NOTA: NO modificamos el grid aquí para evitar race conditions
+  // con múltiples robots. Cada robot mantiene su propia posición
+  // y el rendering se hace en base a los datos del RobotManager.
 }
 
 void Environment::setGoal(const Point &pos) {
@@ -311,8 +300,8 @@ bool Environment::toggleObstacle(const Point &pos) {
   Node *node = getNode(pos.x, pos.y);
   if (!node) return false;
   
-  // No modificar si hay robot o es objetivo
-  if (node->type == CellType::ROBOT || node->type == CellType::GOAL) {
+  // No modificar si es objetivo
+  if (node->type == CellType::GOAL) {
     return false;
   }
   

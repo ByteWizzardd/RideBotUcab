@@ -49,9 +49,9 @@ private:
   static bool readHeader(std::ifstream &ifs, uint16_t &num_robots,
                          uint16_t &num_tasks, uint16_t &num_obstacles);
   static Point readPoint(std::ifstream &ifs);
-  static bool readEnvironment(std::ifstream &ifs, Environment &env);
+  static bool readEnvironment(std::ifstream &ifs, Environment &env, uint16_t num_obstacles);
   static bool readRobots(std::ifstream &ifs, std::vector<Robot *> &robots,
-                         uint16_t count);
+                         uint16_t count, Environment &env);
   static bool readTasks(std::ifstream &ifs, TaskScheduler &scheduler,
                         uint16_t count);
 };

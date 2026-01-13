@@ -14,6 +14,8 @@ public:
     void add_task(const Task& task);
     Task get_next_task();
     bool has_tasks() const;
+    std::vector<Task> getAllTasks() const;
+    void clear();
 
 private:
     struct TaskComparator {
@@ -22,7 +24,7 @@ private:
         }
     };
 
-    std::priority_queue<Task, std::vector<Task>, TaskComparator> task_queue;
+    std::vector<Task> tasks_;
 };
 
 } // namespace OSBot

@@ -1,5 +1,7 @@
 #include "infrastructure/Storage.h"
 #include "domain/Environment.h"
+#include "domain/Robot.h"
+#include "application/TaskScheduler.h"
 #include <cstring>
 #include <ctime>
 #include <iostream>
@@ -24,9 +26,19 @@ bool Storage::save_state(const std::string &filename,
 
   try {
     // Obtener contadores
+    std::vector<Task> tasks = task_scheduler.getAllTasks();
     uint16_t num_robots = static_cast<uint16_t>(robots.size());
-    uint16_t num_tasks = 0;     // TODO: Obtener de task_scheduler
-    uint16_t num_obstacles = 0; // TODO: Calcular del environment
+    uint16_t num_tasks = static_cast<uint16_t>(tasks.size());
+
+    // Contar obstáculos
+    uint16_t num_obstacles = 0;
+    for (int x = 0; x < environment.getWidth(); ++x) {
+        for (int y = 0; y < environment.getHeight(); ++y) {
+            if (!environment.isPositionFree(Point(x, y))) {
+                num_obstacles++;
+            }
+        }
+    }
 
     // Escribir secciones
     writeHeader(ofs, num_robots, num_tasks, num_obstacles);
@@ -76,7 +88,14 @@ void Storage::writeEnvironment(std::ofstream &ofs, const Environment &env) {
   ofs.write(reinterpret_cast<const char *>(&width), sizeof(width));
   ofs.write(reinterpret_cast<const char *>(&height), sizeof(height));
 
-  // TODO: Escribir obstáculos si Environment expone la lista
+  // Escribir obstáculos
+  for (int x = 0; x < width; ++x) {
+      for (int y = 0; y < height; ++y) {
+          if (!env.isPositionFree(Point(x, y))) {
+              writePoint(ofs, Point(x, y));
+          }
+      }
+  }
 }
 
 void Storage::writeRobots(std::ofstream &ofs,
@@ -85,16 +104,33 @@ void Storage::writeRobots(std::ofstream &ofs,
     if (!robot)
       continue;
 
-    // TODO: Escribir datos del robot según RobotInfo
-    // Por ahora placeholder
-    int32_t id = 0;
+    int32_t id = robot->getId();
+    Point pos = robot->getPosition();
+    uint8_t state = static_cast<uint8_t>(robot->getState());
+    float battery = robot->getBatteryLevel();
+
     ofs.write(reinterpret_cast<const char *>(&id), sizeof(id));
+    writePoint(ofs, pos);
+    ofs.write(reinterpret_cast<const char *>(&state), sizeof(state));
+    ofs.write(reinterpret_cast<const char *>(&battery), sizeof(battery));
   }
 }
 
 void Storage::writeTasks(std::ofstream &ofs, const TaskScheduler &scheduler) {
-  // TODO: Serializar tareas del scheduler
-  // Placeholder por ahora
+  std::vector<Task> tasks = scheduler.getAllTasks();
+  for (const auto& task : tasks) {
+      int32_t id = task.getId();
+      // Usamos el primer waypoint como target principal para simplificar
+      // o el actual si tiene múltiples. El formato dice Target X/Y.
+      Point target = task.getCurrentWaypoint(); 
+      uint8_t priority = static_cast<uint8_t>(task.getPriority());
+      uint8_t status = static_cast<uint8_t>(task.getStatus());
+
+      ofs.write(reinterpret_cast<const char *>(&id), sizeof(id));
+      writePoint(ofs, target);
+      ofs.write(reinterpret_cast<const char *>(&priority), sizeof(priority));
+      ofs.write(reinterpret_cast<const char *>(&status), sizeof(status));
+  }
 }
 
 // ============================================================================
@@ -123,9 +159,9 @@ bool Storage::load_state(const std::string &filename, Environment &environment,
     }
 
     // Leer secciones
-    if (!readEnvironment(ifs, environment))
+    if (!readEnvironment(ifs, environment, num_obstacles))
       return false;
-    if (!readRobots(ifs, robots, num_robots))
+    if (!readRobots(ifs, robots, num_robots, environment))
       return false;
     if (!readTasks(ifs, task_scheduler, num_tasks))
       return false;
@@ -180,32 +216,98 @@ Point Storage::readPoint(std::ifstream &ifs) {
   return p;
 }
 
-bool Storage::readEnvironment(std::ifstream &ifs, Environment &env) {
+bool Storage::readEnvironment(std::ifstream &ifs, Environment &env, uint16_t num_obstacles) {
   // Leer dimensiones
   int32_t width, height;
   ifs.read(reinterpret_cast<char *>(&width), sizeof(width));
   ifs.read(reinterpret_cast<char *>(&height), sizeof(height));
 
-  // TODO: Validar que coincidan con el environment actual
-  // TODO: Leer obstáculos
+  if (width != env.getWidth() || height != env.getHeight()) {
+      std::cerr << "[Storage] Warning: Dimensiones del mapa difieren. Se esperaban " 
+                << env.getWidth() << "x" << env.getHeight() << " pero se leyó " 
+                << width << "x" << height << std::endl;
+      // Continuamos pero podría haber problemas si los obstáculos están fuera de rango
+  }
+
+  // Limpiar obstáculos actuales
+  env.clearAllObstacles();
+  
+  // Leer obstáculos y marcarlos
+  for (uint16_t i = 0; i < num_obstacles; ++i) {
+      Point p = readPoint(ifs);
+      // toggleObstacle agrega si no existe, o quita si existe.
+      // Como limpiamos todo antes, toggle agregará.
+      // Verificamos rango por seguridad
+      if (p.x >= 0 && p.x < width && p.y >= 0 && p.y < height) {
+          env.toggleObstacle(p);
+      }
+  }
 
   return true;
 }
 
 bool Storage::readRobots(std::ifstream &ifs, std::vector<Robot *> &robots,
-                         uint16_t count) {
-  // TODO: Recrear robots desde datos binarios
+                         uint16_t count, Environment &env) {
+  // Nota: No limpiamos el vector 'robots' aquí porque asumimos que el caller (RobotManager)
+  // ya debe haber gestionado la limpieza de los robots anteriores si fuera necesario.
+  // Sin embargo, load_state recibe un vector de punteros. 
+  // Para ser seguros, deberíamos asumir que el vector que nos pasan es para llenar.
+  
+  // IMPORTANTE: Storage NO posee los robots. RobotManager sí.
+  // Si RobotManager nos pasó un vector vacío para llenar, bien.
+  // Si nos pasó el vector actual, hay que limpiarlo?
+  // Normalmente load_state debería reconstruir todo.
+  
+  // Vamos a instanciar nuevos robots.
   for (uint16_t i = 0; i < count; ++i) {
     int32_t id;
+    uint8_t stateVal;
+    float battery;
+
     ifs.read(reinterpret_cast<char *>(&id), sizeof(id));
+    Point pos = readPoint(ifs);  // Leer DESPUÉS del ID
+    ifs.read(reinterpret_cast<char *>(&stateVal), sizeof(stateVal));
+    ifs.read(reinterpret_cast<char *>(&battery), sizeof(battery));
+
+    // Crear nuevo robot usando el environment pasado
+    Robot* robot = new Robot(env);
+    robot->setId(id);
+    robot->setPosition(pos);
+    robot->setBatteryLevel(battery);
+    
+    // Si queremos restaurar el estado exacto, necesitaríamos un setter de estado
+    // pero por defecto inicia en IDLE, lo cual es seguro.
+    
+    robots.push_back(robot);
   }
   return true;
 }
 
+
 bool Storage::readTasks(std::ifstream &ifs, TaskScheduler &scheduler,
                         uint16_t count) {
-  // TODO: Recrear tareas desde datos binarios
+  scheduler.clear();
+  for (uint16_t i = 0; i < count; ++i) {
+      int32_t id;
+      ifs.read(reinterpret_cast<char *>(&id), sizeof(id));
+
+      Point target = readPoint(ifs);
+      uint8_t priority;
+      uint8_t status;
+      ifs.read(reinterpret_cast<char *>(&priority), sizeof(priority));
+      ifs.read(reinterpret_cast<char *>(&status), sizeof(status));
+
+      std::vector<Point> waypoints = {target};
+      Task task(id, waypoints, static_cast<TaskPriority>(priority));
+      
+      // La tarea se crea con estado PENDING por defecto
+      // Si el estado guardado era diferente, lo seteamos
+      task.setStatus(static_cast<TaskStatus>(status));
+      
+      scheduler.add_task(task);
+  }
   return true;
 }
 
 } // namespace OSBot
+

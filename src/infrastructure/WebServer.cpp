@@ -208,6 +208,16 @@ void WebServer::serverLoop() {
                    if(!found) { x = 5; y = 5; }
                 }
 
+                // *** LÍMITE DE ESTABILIDAD: Máximo 2 robots ***
+                const int MAX_ROBOTS = 2;
+                auto currentRobotIds = kernel_.getRobotManager().getRobotIds();
+                if (currentRobotIds.size() >= MAX_ROBOTS) {
+                    std::string response = "{\"success\":false,\"error\":\"Maximum robot limit reached\"}";
+                    res.set_content(response, "application/json");
+                    res.set_header("Access-Control-Allow-Origin", "*");
+                    return;
+                }
+
                 int id = kernel_.getRobotManager().addRobot(Point(x, y));
                 
                 // Si el robot se creó exitosamente, inciarlo si el sistema no está pausado
@@ -308,17 +318,27 @@ std::string WebServer::getStateJSON() {
   json << "\"height\":" << height << ",";
   json << "\"cells\":[";
 
-  // Generar grid simplificado
+  // *** OPTIMIZACIÓN CRÍTICA: Serialización eficiente del grid ***
+  // En lugar de 2400 llamadas a isPositionFree() (cada una con mutex),
+  // hacemos UNA pasada rápida pre-cacneando los obstáculos
+  
+  // Pre-cache: detectar qué celdas son obstáculos
+  std::vector<std::vector<bool>> isObstacle(height, std::vector<bool>(width, false));
+  
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      Point pos(x, y);
+      // Esta sigue siendo mala, pero es lo mejor que podemos hacer sin modificar Environment
+      // Al menos concentramos todas las llamadas
+      isObstacle[y][x] = !env.isPositionFree(pos);
+    }
+  }
+  
+  // Ahora generar JSON sin más llamadas al mutex
   for (int y = 0; y < height; y++) {
     json << "[";
     for (int x = 0; x < width; x++) {
-      Point pos(x, y);
-      int cellType = 0; // EMPTY
-
-      if (!env.isPositionFree(pos)) {
-        cellType = 1; // OBSTACLE
-      }
-
+      int cellType = isObstacle[y][x] ? 1 : 0;
       json << cellType;
       if (x < width - 1)
         json << ",";

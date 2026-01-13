@@ -67,6 +67,26 @@ public:
   int getObstaclesAvoided() const { return obstaclesAvoided_; }
 
   /**
+   * @brief Obtiene el ID del robot
+   */
+  int getId() const;
+
+  /**
+   * @brief Establece el ID del robot
+   */
+  void setId(int id);
+
+  /**
+   * @brief Obtiene el nivel de batería
+   */
+  float getBatteryLevel() const;
+
+  /**
+   * @brief Establece el nivel de batería
+   */
+  void setBatteryLevel(float level);
+
+  /**
    * @brief Establece un objetivo personal para este robot
    * @param p Coordenada del objetivo
    */
@@ -113,6 +133,10 @@ private:
   // Control de hilos
   std::unique_ptr<std::thread> robotThread_;
   std::atomic<bool> running_;
+
+  // Datos para serialización
+  int id_;
+  float batteryLevel_;
 
   /**
    * @brief Función principal del hilo del robot

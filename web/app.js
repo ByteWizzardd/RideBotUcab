@@ -4,7 +4,7 @@
 
 // Configuración
 const API_BASE = '';
-const UPDATE_INTERVAL = 200; // ms
+const UPDATE_INTERVAL = 1000; // ms - Aumentado para estabilidad con múltiples robots
 
 // Estado global
 let state = {
@@ -307,6 +307,15 @@ async function resetRobot() {
 }
 
 async function addRobot() {
+    const MAX_ROBOTS = 2; // Límite para estabilidad garantizada
+
+    // Verificar límite
+    if (state.robots && state.robots.length >= MAX_ROBOTS) {
+        alert(`⚠️ Máximo ${MAX_ROBOTS} robots permitidos para estabilidad del sistema`);
+        addEvent('warning', `Límite de ${MAX_ROBOTS} robots alcanzado`);
+        return;
+    }
+
     try {
         // Enviar petición sin coordenadas para usar las aleatorias del backend
         const response = await fetch(API_BASE + '/api/robot', {

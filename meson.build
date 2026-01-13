@@ -59,6 +59,35 @@ executable('os-bot',
 )
 
 # ============================================
+# Test Executable
+# ============================================
+
+test_sources = [
+  'tests/test_storage.cpp',
+  'src/domain/Environment.cpp',
+  'src/domain/Robot.cpp',
+  'src/domain/Task.cpp',
+  'src/application/Kernel.cpp',
+  'src/application/RobotManager.cpp',
+  'src/application/TaskManager.cpp',
+  'src/application/ThreadManager.cpp',
+  'src/application/TaskScheduler.cpp',
+  'src/application/NavigationModule.cpp',
+  'src/application/AStar.cpp',
+  'src/infrastructure/GPSSensor.cpp',
+  'src/infrastructure/LIDARSensor.cpp',
+  'src/infrastructure/Storage.cpp',
+  'src/infrastructure/WebServer.cpp'
+]
+
+executable('os-bot-test',
+  test_sources,
+  include_directories: inc_dirs,
+  dependencies: [threads_dep],
+  install: false
+)
+
+# ============================================
 # Mensaje informativo
 # ============================================
 

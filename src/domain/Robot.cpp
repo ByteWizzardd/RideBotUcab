@@ -11,7 +11,8 @@ namespace OSBot {
 
 Robot::Robot(Environment &env)
     : environment_(env), currentPosition_(1, 1), currentState_(State::IDLE),
-      running_(false), pathIndex_(0), obstaclesAvoided_(0), cellsTraveled_(0) {}
+      running_(false), pathIndex_(0), obstaclesAvoided_(0), cellsTraveled_(0),
+      id_(0), batteryLevel_(100.0f) {}
 
 // ... existing code ...
 
@@ -286,5 +287,13 @@ bool Robot::followPlannedPath() {
 
   return false;
 }
+
+
+
+int Robot::getId() const { return id_; }
+void Robot::setId(int id) { id_ = id; }
+
+float Robot::getBatteryLevel() const { return batteryLevel_; }
+void Robot::setBatteryLevel(float level) { batteryLevel_ = level; }
 
 } // namespace OSBot

@@ -23,6 +23,7 @@ int RobotManager::addRobot(const Point& homePosition) {
     
     // IMPORTANTE: Establecer la posición inicial correcta en el robot
     robot->setPosition(homePosition);
+    robot->setId(robotId); // Asignar ID al robot para serialización
     
     auto robotInfo = std::make_unique<RobotInfo>(robotId, std::move(robot), homePosition);
     
@@ -261,6 +262,8 @@ void RobotManager::resetRobotPosition() {
             
             // Crear nuevo robot en la nueva posición
             auto newRobot = std::make_unique<Robot>(environment_);
+            newRobot->setId(id); // ¡IMPORTANTE! Preservar el ID original
+            newRobot->setPosition(newPos);
             info->robot = std::move(newRobot);
             info->homePosition = newPos;
             
