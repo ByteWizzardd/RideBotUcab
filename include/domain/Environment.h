@@ -95,6 +95,13 @@ public:
    * @brief Detiene el hilo de actualización del entorno
    */
   void stop();
+  
+  /**
+   * @brief Obtiene un snapshot thread-safe del grid completo
+   * @return Vector 2D con el estado de cada celda (0=libre, 1=obstáculo)
+   * NOTA: Esta función adquiere el mutex UNA VEZ para copiar todo el grid
+   */
+  std::vector<std::vector<int>> getGridSnapshot() const;
 
   // ========== Métodos de edición interactiva ==========
   

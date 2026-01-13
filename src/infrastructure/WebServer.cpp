@@ -318,33 +318,18 @@ std::string WebServer::getStateJSON() {
   json << "\"height\":" << height << ",";
   json << "\"cells\":[";
 
-  // *** OPTIMIZACIÓN CRÍTICA: Serialización eficiente del grid ***
-  // En lugar de 2400 llamadas a isPositionFree() (cada una con mutex),
-  // hacemos UNA pasada rápida pre-cacneando los obstáculos
+  // *** FIX DEFINITIVO: Usar getGridSnapshot() - UN SOLO LOCK ***
+  auto gridSnapshot = env.getGridSnapshot();
   
-  // Pre-cache: detectar qué celdas son obstáculos
-  std::vector<std::vector<bool>> isObstacle(height, std::vector<bool>(width, false));
-  
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      Point pos(x, y);
-      // Esta sigue siendo mala, pero es lo mejor que podemos hacer sin modificar Environment
-      // Al menos concentramos todas las llamadas
-      isObstacle[y][x] = !env.isPositionFree(pos);
-    }
-  }
-  
-  // Ahora generar JSON sin más llamadas al mutex
-  for (int y = 0; y < height; y++) {
+  for (size_t y = 0; y < gridSnapshot.size(); y++) {
     json << "[";
-    for (int x = 0; x < width; x++) {
-      int cellType = isObstacle[y][x] ? 1 : 0;
-      json << cellType;
-      if (x < width - 1)
+    for (size_t x = 0; x < gridSnapshot[y].size(); x++) {
+      json << gridSnapshot[y][x];
+      if (x < gridSnapshot[y].size() - 1)
         json << ",";
     }
     json << "]";
-    if (y < height - 1)
+    if (y < gridSnapshot.size() - 1)
       json << ",";
   }
 

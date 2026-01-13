@@ -229,6 +229,26 @@ void Environment::stop() {
   }
 }
 
+std::vector<std::vector<int>> Environment::getGridSnapshot() const {
+  // *** SOLUCIÓN DEFINITIVA AL BUG DE RACE CONDITION ***
+  // Adquirir mutex UNA VEZ y copiar todo el grid
+  std::lock_guard<std::mutex> lock(mapMutex_);
+  
+  std::vector<std::vector<int>> snapshot(height_, std::vector<int>(width_, 0));
+  
+  for (int y = 0; y < height_; y++) {
+    for (int x = 0; x < width_; x++) {
+      Node *node = const_cast<Environment*>(this)->getNode(x, y);
+      if (node && node->type == CellType::OBSTACLE) {
+        snapshot[y][x] = 1;
+      }
+      // GOAL no se marca en el grid - se envía por separado
+    }
+  }
+  
+  return snapshot;
+}
+
 void Environment::updateLoop() {
   while (running_) {
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
